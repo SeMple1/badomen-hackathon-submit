@@ -1,0 +1,37 @@
+html, body { height: 100%; margin: 0; overflow: hidden; background: #05060a; cursor: default; }
+    canvas { display:block; width:100vw; height:100vh; }
+
+    .overlay{
+      position:fixed; inset:0; pointer-events:none;
+      background:
+        radial-gradient(1200px 900px at 50% 45%, rgba(18,22,34,0.55), rgba(0,0,0,0) 62%),
+        radial-gradient(900px 700px at 60% 58%, rgba(120,30,30,0.10), rgba(0,0,0,0) 65%),
+        radial-gradient(1100px 800px at 40% 60%, rgba(70,90,170,0.08), rgba(0,0,0,0) 70%),
+        radial-gradient(closest-side at 50% 50%, rgba(0,0,0,0) 0%, rgba(0,0,0,0.55) 72%, rgba(0,0,0,0.90) 100%);
+      mix-blend-mode: screen;
+      opacity: .92;
+    }
+
+    .grain{
+      position:fixed; inset:-30%; pointer-events:none; opacity:.16; mix-blend-mode:overlay;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='260' height='260' filter='url(%23n)' opacity='.36'/%3E%3C/svg%3E");
+      animation:g 6s steps(6) infinite;
+    }
+    @keyframes g{
+      0%{transform:translate(0,0) rotate(1deg) scale(1.05)}
+      20%{transform:translate(-2%,1%) rotate(1deg) scale(1.05)}
+      40%{transform:translate(2%,-1%) rotate(1deg) scale(1.05)}
+      60%{transform:translate(-1%,-2%) rotate(1deg) scale(1.05)}
+      80%{transform:translate(1%,2%) rotate(1deg) scale(1.05)}
+      100%{transform:translate(0,0) rotate(1deg) scale(1.05)}
+    }
+
+    .hud{
+      position:fixed; left:16px; top:14px; z-index:5;
+      font:12px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans Thai", sans-serif;
+      color:rgba(220,230,255,.75);
+      user-select:none; pointer-events:none;
+      text-shadow:0 0 18px rgba(120,140,255,.12);
+      letter-spacing:.2px;
+    }
+    .hud b{ color:rgba(255,210,210,.9); }

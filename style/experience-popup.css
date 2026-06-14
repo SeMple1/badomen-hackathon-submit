@@ -1,0 +1,56 @@
+.experience-popup {
+    position: fixed;
+    inset: 0;
+    z-index: 12000;
+    display: grid;
+    place-items: center;
+    padding: 20px;
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity .2s ease, visibility .2s ease;
+    contain: layout paint style;
+}
+.experience-popup.is-open { visibility: visible; opacity: 1; }
+.experience-popup__backdrop { position: absolute; inset: 0; background: rgba(15, 23, 42, .62); }
+.experience-popup__panel {
+    position: relative;
+    z-index: 1;
+    width: min(520px, 100%);
+    padding: 30px;
+    border-radius: 28px;
+    background: #fff;
+    box-shadow: 0 18px 48px rgba(15, 23, 42, .22);
+    text-align: center;
+    contain: layout paint;
+}
+.experience-popup__close { position: absolute; top: 14px; right: 16px; border: 0; background: transparent; color: #64748b; font-size: 28px; cursor: pointer; }
+.experience-popup__eyebrow { color: #2563eb; font-size: 12px; font-weight: 900; letter-spacing: .14em; }
+.experience-popup h2 { margin: 10px 0 6px; color: #0f172a; font-size: 25px; }
+.experience-popup p { color: #64748b; }
+.experience-stars { display: flex; justify-content: center; gap: 8px; margin: 22px 0; }
+.experience-stars button { border: 0; padding: 0; color: #cbd5e1; background: transparent; font-size: 42px; cursor: pointer; transition: color .15s, transform .15s; }
+.experience-stars button:hover, .experience-stars button.is-active { color: #f59e0b; transform: translateY(-2px); }
+.experience-popup textarea { width: 100%; min-height: 105px; resize: vertical; padding: 13px; border: 1px solid #cbd5e1; border-radius: 15px; font: inherit; }
+.experience-popup__message { min-height: 22px; margin: 8px 0 0; font-size: 13px; }
+.experience-popup__actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 12px; }
+.experience-button { min-height: 44px; padding: 0 18px; border-radius: 13px; font-weight: 850; cursor: pointer; }
+.experience-button--ghost { border: 1px solid #cbd5e1; background: #fff; color: #475569; }
+.experience-button--primary { border: 0; background: #2563eb; color: #fff; }
+.experience-button:disabled { opacity: .5; cursor: not-allowed; }
+body.experience-open { overflow: hidden; }
+@media (max-width: 560px) {
+    .experience-popup__panel { padding: 25px 18px 20px; border-radius: 22px; }
+    .experience-stars button { font-size: 35px; }
+    .experience-popup__actions { flex-direction: column-reverse; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .experience-popup,
+    .experience-stars button {
+        transition: none !important;
+    }
+
+    .experience-stars button:hover,
+    .experience-stars button.is-active {
+        transform: none;
+    }
+}

@@ -1,0 +1,56 @@
+@'
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Local config / secrets
+config.local.php
+database.local.php
+.env.database.local
+.env.local
+
+# Gmail / API secret notes
+GMAIL_SETUP.md
+
+# Logs
+*.log
+php-server-error.log
+.codex-*.log
+.codex-*.out.log
+
+# Codex / temp screenshots
+.codex-screenshots/
+.codex-*
+
+# Runtime storage
+storage/*
+!storage/.gitkeep
+
+# Uploads
+uploads/*
+!uploads/.gitkeep
+
+# Composer dependencies
+vendor/
+
+# Backup / dump files
+*.zip
+*.rar
+*.7z
+*.tar
+*.gz
+*.sql.gz
+*.bak
+*.backup
+
+# Temporary / old files
+tester.html
+Hackathon File/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+'@ | Set-Content -Encoding UTF8 .gitignore

@@ -1,0 +1,173 @@
+.location-picker {
+    margin-top: 12px;
+    overflow: hidden;
+    border: 1px solid #cbd5e1;
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, .05);
+}
+
+body.location-actions-gated .form-actions {
+    transition: opacity .22s ease, transform .22s ease, visibility .22s ease, box-shadow .18s ease, background .18s ease;
+}
+
+body.location-actions-gated:not(.location-picker-reached) .form-actions {
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(18px);
+}
+
+body.location-actions-gated.location-picker-reached .form-actions {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+}
+
+.location-picker__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 10px 12px;
+    background: #f8fafc;
+}
+
+.location-picker__head strong,
+.location-picker__head span {
+    display: block;
+}
+
+.location-picker__head strong {
+    color: #0f172a;
+}
+
+.location-picker__head span {
+    margin-top: 3px;
+    color: #64748b;
+    font-size: 11.5px;
+}
+
+.location-picker button {
+    min-height: 36px;
+    padding: 0 11px;
+    border: 1px solid #bfdbfe;
+    border-radius: 11px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    color: #1d4ed8;
+    background: #eff6ff;
+    font-weight: 900;
+    cursor: pointer;
+}
+
+.location-picker button:hover {
+    border-color: #93c5fd;
+    background: #dbeafe;
+}
+
+.location-picker__tools {
+    display: grid;
+    gap: 10px;
+    padding: 11px 12px;
+    border-top: 1px solid #e2e8f0;
+    background: linear-gradient(180deg, #fff, #f8fafc);
+}
+
+.location-picker__search,
+.location-picker__coords {
+    display: grid;
+    gap: 10px;
+}
+
+.location-picker__search {
+    grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.location-picker__coords {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+}
+
+.location-picker label {
+    min-width: 0;
+    display: grid;
+    gap: 5px;
+}
+
+.location-picker label span {
+    color: #475569;
+    font-size: 12px;
+    font-weight: 900;
+}
+
+.location-picker input {
+    width: 100%;
+    min-height: 38px;
+    padding: 0 11px;
+    border: 1px solid #cbd5e1;
+    border-radius: 11px;
+    color: #0f172a;
+    background: #fff;
+    outline: none;
+    font: inherit;
+}
+
+.location-picker input:focus {
+    border-color: #60a5fa;
+    box-shadow: 0 0 0 4px rgba(96, 165, 250, .18);
+}
+
+.location-picker__map {
+    height: clamp(190px, 22vw, 230px);
+    background: #e2e8f0;
+}
+
+.location-picker__status {
+    padding: 8px 12px;
+    color: #64748b;
+    background: #fff;
+    font-size: 11.5px;
+    font-weight: 800;
+}
+
+.location-picker__status.is-set {
+    color: #047857;
+    background: #ecfdf5;
+}
+
+.location-picker__status.is-error {
+    color: #b91c1c;
+    background: #fef2f2;
+}
+
+.location-picker__status.is-loading {
+    color: #1d4ed8;
+    background: #eff6ff;
+}
+
+@media (max-width: 760px) {
+    .location-picker__head {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .location-picker__head button,
+    .location-picker__search,
+    .location-picker__coords,
+    .location-picker__search button,
+    .location-picker__coords button {
+        width: 100%;
+    }
+
+    .location-picker__search,
+    .location-picker__coords {
+        grid-template-columns: 1fr;
+    }
+
+    .location-picker__map {
+        height: 200px;
+    }
+}
