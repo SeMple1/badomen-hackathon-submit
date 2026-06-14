@@ -10,6 +10,9 @@ $ttl = (int)($ttl_seconds ?? 1800);
 $is_pending = (bool)($is_pending ?? false);
 $is_rejected = (bool)($is_rejected ?? false);
 $is_checked_in = (bool)($is_checked_in ?? false);
+$is_outside_event_window = (bool)($is_outside_event_window ?? false);
+$event_window_warning = (string)($event_window_warning ?? '');
+$requires_outside_window_confirm = (bool)($requires_outside_window_confirm ?? false);
 $cooldown = (int)($cooldown_seconds ?? 180);
 $status = (string)($status ?? '');
 
@@ -143,6 +146,13 @@ if ($is_pending) {
                         </div>
                     <?php endif; ?>
 
+                    <?php if ($is_outside_event_window && $event_window_warning !== ''): ?>
+                        <div class="userotp-alert userotp-alert--warning">
+                            <strong>อยู่นอกช่วงกิจกรรม</strong>
+                            <p><?= $escape($event_window_warning) ?></p>
+                        </div>
+                    <?php endif; ?>
+
                     <?php if (!empty($info)): ?>
                         <div class="userotp-alert userotp-alert--info">
                             <ul class="compact-list">
@@ -171,8 +181,9 @@ if ($is_pending) {
                     </section>
 
                     <?php if (!$is_checked_in && !$is_pending): ?>
-                        <form method="post" class="userotp-actions">
+                        <form method="post" class="userotp-actions" data-outside-window="<?= $is_outside_event_window ? '1' : '0' ?>" data-outside-window-message="<?= $escape($event_window_warning) ?>">
                             <input type="hidden" name="event_id" value="<?= (int)$event_id ?>">
+                            <input type="hidden" name="confirm_outside_window" value="<?= $requires_outside_window_confirm ? '1' : '0' ?>" data-outside-window-confirm>
                             <button id="otpBtn" type="submit" class="userotp-primary-btn" <?= ($cooldownRemaining > 0) ? 'disabled' : '' ?>>
                                 ขอรหัส OTP ใหม่อีกครั้ง
                             </button>
@@ -206,6 +217,8 @@ if ($is_pending) {
             const cooldownText = document.getElementById('cooldownText');
             const ttlBar = document.getElementById('ttlBar');
             const otpBtn = document.getElementById('otpBtn');
+            const otpForm = otpBtn?.closest('form');
+            const outsideConfirmInput = otpForm?.querySelector('[data-outside-window-confirm]');
 
             let lastTick = Date.now();
             let tickTimer = 0;
@@ -264,7 +277,7 @@ if ($is_pending) {
                 const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
                 if (document.hidden) return 15000;
                 if (connection && connection.saveData) return 12000;
-                return 6000;
+                return 3000;
             }
 
             async function checkCheckedIn() {
@@ -288,7 +301,7 @@ if ($is_pending) {
 
                     if (res.ok && res.headers.get('X-Checked-In') === '1') {
                         document.body.classList.add('is-checking-in');
-                        window.setTimeout(() => window.location.reload(), 420);
+                        window.location.reload();
                         return;
                     }
                 } catch (_) {
@@ -321,6 +334,16 @@ if ($is_pending) {
                 window.clearTimeout(tickTimer);
                 window.clearTimeout(pollTimer);
             }, { passive: true });
+
+            otpForm?.addEventListener('submit', (event) => {
+                if (otpForm.dataset.outsideWindow !== '1' || outsideConfirmInput?.value === '1') return;
+                const message = otpForm.dataset.outsideWindowMessage || 'ตอนนี้ไม่ได้อยู่ในช่วงวัน/เวลาของกิจกรรม ต้องการขอหรือกรอก OTP แน่นอนใช่ไหม?';
+                if (!window.confirm(message)) {
+                    event.preventDefault();
+                    return;
+                }
+                if (outsideConfirmInput) outsideConfirmInput.value = '1';
+            });
 
             startCountdown();
             if (!alreadyCheckedIn) schedulePoll(3000);

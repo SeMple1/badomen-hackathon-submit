@@ -224,6 +224,8 @@ foreach ($events as $eventIndex => $event) {
         && ($saleEndTs === null || $saleEndTs >= time());
     $tags = is_array($event['tags'] ?? null) ? $event['tags'] : [];
     $eventId = (int)($event['event_id'] ?? 0);
+    $createdAtDT = $parseDbDateTime((string)($event['created_at'] ?? ''), $tz, false);
+    $isNewEvent = $createdAtDT instanceof DateTimeImmutable && $createdAtDT >= $now->modify('-1 day');
 
     $modalPayload = [
         'event_id' => $eventId,
@@ -305,6 +307,7 @@ foreach ($events as $eventIndex => $event) {
         'rank_score' => (float)($event['rank_score'] ?? 0),
         'pending_count' => (int)($event['pending_count'] ?? 0),
         'created_at' => (string)($event['created_at'] ?? ''),
+        'is_new' => $isNewEvent,
         'event_start' => (string)($event['event_start'] ?? ''),
         'event_index' => $eventIndex,
     ];
@@ -377,6 +380,9 @@ $renderEventCard = static function (array $card, string $modifier = '', bool $ea
     $isFavorite = !empty($event['is_favorite']);
     $favoriteCount = (int)($card['favorite_count'] ?? 0);
     $className = trim('event-card ' . $modifier);
+    if (!empty($card['is_new'])) {
+        $className .= ' event-card--new';
+    }
     ?>
     <button
         type="button"
@@ -391,6 +397,9 @@ $renderEventCard = static function (array $card, string $modifier = '', bool $ea
                 decoding="async"
                 fetchpriority="<?= $eager ? 'high' : 'low' ?>">
             <span class="date-chip"><i class="bx bx-calendar-event"></i> <?= $escape((string)$card['date_short']) ?></span>
+            <?php if (!empty($card['is_new'])): ?>
+                <span class="new-event-chip"><i class="bx bx-sparkles"></i> ใหม่</span>
+            <?php endif; ?>
         </div>
 
         <?php if (!empty($card['sale_active'])): ?>
@@ -483,7 +492,6 @@ $renderEventCard = static function (array $card, string $modifier = '', bool $ea
             aria-labelledby="homeInTitle"
             style="--home-in-hero-bg-image: url('/assets/event.png?v=1');">
             <div class="hero-copy">
-                <div class="hero-eyebrow"><i class="bx bx-calendar-star"></i> EVENT TICKETING PLATFORM</div>
                 <h1 id="homeInTitle" class="hero-title">ค้นหาอีเวนต์ <span>และจองสิทธิ์เข้าร่วม</span></h1>
                 <p class="hero-subtitle">
                     รวมกิจกรรมจากผู้จัดหลายคนในหน้าเดียว พร้อมสถานะสมัคร จำนวนที่นั่ง รูปภาพกิจกรรม และรายละเอียดก่อนตัดสินใจเข้าร่วม
@@ -759,6 +767,10 @@ $renderEventCard = static function (array $card, string $modifier = '', bool $ea
             <div class="home-event-chat__suggestions">
                 <button type="button" data-chat-prompt="มีกิจกรรมอะไรบ้าง">กิจกรรมทั้งหมด</button>
                 <button type="button" data-chat-prompt="หากิจกรรมฟรี">กิจกรรมฟรี</button>
+                <button type="button" data-chat-prompt="แนะนำกิจกรรมใกล้เข้ามา">ใกล้เข้ามา</button>
+                <button type="button" data-chat-prompt="สรุปกิจกรรมที่น่าไปที่สุด">สรุปให้หน่อย</button>
+                <button type="button" data-chat-prompt="มีงานดนตรีหรือคอนเสิร์ตไหม">ดนตรี</button>
+                <button type="button" data-chat-prompt="มีเวิร์กช็อปไหม">เวิร์กช็อป</button>
             </div>
             <form>
                 <input type="text" name="message" maxlength="200" placeholder="ถามเกี่ยวกับกิจกรรม...">
@@ -1378,10 +1390,85 @@ $renderEventCard = static function (array $card, string $modifier = '', bool $ea
         if (!node) return;
         let nextData = {};
         try { nextData = JSON.parse(node.textContent || '{}'); } catch (_) { return; }
-        Object.keys(eventModalData).forEach((key) => {
-            if (!Object.prototype.hasOwnProperty.call(nextData, key)) delete eventModalData[key];
-        });
         Object.assign(eventModalData, nextData);
+    }
+
+    const homeImageCache = new Map();
+
+    function warmHomeImage(src) {
+        const url = String(src || '').trim();
+        if (!url || url.startsWith('data:image/')) return Promise.resolve(false);
+        const cached = homeImageCache.get(url);
+        if (cached) return cached;
+
+        const task = new Promise((resolve) => {
+            const image = new Image();
+            let done = false;
+            const finish = (ok) => {
+                if (done) return;
+                done = true;
+                resolve(ok);
+            };
+            image.decoding = 'async';
+            image.onload = () => finish(true);
+            image.onerror = () => finish(false);
+            image.src = url;
+            if (image.complete) finish(true);
+            window.setTimeout(() => finish(false), 1400);
+        });
+        homeImageCache.set(url, task);
+        return task;
+    }
+
+    function cardId(card) {
+        return String(card?.dataset?.eventId || '').trim();
+    }
+
+    async function warmNewSnapshotImages(nextDoc) {
+        const urls = [];
+        nextDoc.querySelectorAll('.event-card[data-event-id]').forEach((nextCard) => {
+            const id = cardId(nextCard);
+            if (!id || document.querySelector(`.event-card[data-event-id="${CSS.escape(id)}"]`)) return;
+            const img = nextCard.querySelector('.card-media img');
+            const src = img?.getAttribute('src') || '';
+            if (src) urls.push(src);
+        });
+        if (!urls.length) return;
+        await Promise.allSettled([...new Set(urls)].map(warmHomeImage));
+    }
+
+    function mergeCardListFromSnapshot(nextDoc, selector) {
+        const current = document.querySelector(selector);
+        const next = nextDoc.querySelector(selector);
+        if (!current || !next) return false;
+
+        const currentCards = new Map();
+        current.querySelectorAll(':scope > .event-card[data-event-id]').forEach((card) => {
+            const id = cardId(card);
+            if (id) currentCards.set(id, card);
+        });
+
+        let changed = false;
+        const nextCards = Array.from(next.querySelectorAll(':scope > .event-card[data-event-id]'));
+        const nextIds = nextCards.map(cardId);
+
+        nextCards.forEach((nextCard, index) => {
+            const id = nextIds[index];
+            if (!id || currentCards.has(id)) return;
+
+            const imported = document.importNode(nextCard, true);
+            const before = nextIds.slice(index + 1)
+                .map((nextId) => currentCards.get(nextId))
+                .find(Boolean) || null;
+            current.insertBefore(imported, before);
+            currentCards.set(id, imported);
+            changed = true;
+            requestAnimationFrame(() => imported.classList.add('is-live-new'));
+            window.setTimeout(() => imported.classList.remove('is-live-new'), 3600);
+        });
+
+        if (changed) hydrateCardImageOrientation(current);
+        return changed;
     }
 
     function replaceFromSnapshot(nextDoc, selector) {
@@ -1453,6 +1540,7 @@ $renderEventCard = static function (array $card, string $modifier = '', bool $ea
 
     function clearHomeSnapshotCache() {
         homeSnapshotMemoryCache = null;
+        homeImageCache.clear();
         try {
             for (let i = sessionStorage.length - 1; i >= 0; i -= 1) {
                 const key = sessionStorage.key(i);
@@ -1512,8 +1600,11 @@ $renderEventCard = static function (array $card, string $modifier = '', bool $ea
         return url.toString();
     }
 
-    function applyHomeSnapshot(html) {
-        const nextDoc = new DOMParser().parseFromString(html, 'text/html');
+    function applyHomeSnapshot(snapshot) {
+        const nextDoc = typeof snapshot === 'string'
+            ? new DOMParser().parseFromString(snapshot, 'text/html')
+            : snapshot;
+        if (!nextDoc) return false;
         updateModalDataFromDocument(nextDoc);
 
         const main = document.querySelector('.home-in-main');
@@ -1535,11 +1626,15 @@ $renderEventCard = static function (array $card, string $modifier = '', bool $ea
             '.trending-section .section-actions',
             '.new-section .section-actions',
             '.all-events-section .section-actions',
+        ].forEach((selector) => {
+            changed = replaceFromSnapshot(nextDoc, selector) || changed;
+        });
+        [
             '.trending-section [data-card-list="trending"]',
             '.new-section [data-card-list="new"]',
             '.all-events-section [data-card-list="all"]'
         ].forEach((selector) => {
-            changed = replaceFromSnapshot(nextDoc, selector) || changed;
+            changed = mergeCardListFromSnapshot(nextDoc, selector) || changed;
         });
         applyCardView(currentCardView());
         return changed;
@@ -1557,8 +1652,10 @@ $renderEventCard = static function (array $card, string $modifier = '', bool $ea
             });
             if (!response.ok) throw new Error('snapshot_failed');
             const html = await response.text();
+            const nextDoc = new DOMParser().parseFromString(html, 'text/html');
+            await warmNewSnapshotImages(nextDoc);
             writeCachedHomeSnapshot(html);
-            applyHomeSnapshot(html);
+            applyHomeSnapshot(nextDoc);
             setLiveStatus('Live', 'ok');
         } catch (_) {
             const cached = readCachedHomeSnapshot();
@@ -2037,6 +2134,43 @@ $renderEventCard = static function (array $card, string $modifier = '', bool $ea
         }
     }
 
+    async function openEventById(eventId, fallbackUrl = '') {
+        const id = String(eventId || '');
+        if (!id) return false;
+
+        let eventData = eventModalData[id];
+        if (!eventData) {
+            try {
+                const url = new URL(fallbackUrl || `/home_in?show_all=1#event-${encodeURIComponent(id)}`, window.location.href);
+                url.hash = '';
+                url.searchParams.set('show_all', '1');
+                url.searchParams.set('live', '1');
+                url.searchParams.set('_', String(Date.now()));
+                const response = await fetch(url.toString(), {
+                    credentials: 'same-origin',
+                    cache: 'no-store',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                if (!response.ok) throw new Error('event_snapshot_failed');
+                const html = await response.text();
+                writeCachedHomeSnapshot(html);
+                applyHomeSnapshot(html);
+                eventData = eventModalData[id];
+            } catch (_) {
+                eventData = null;
+            }
+        }
+
+        if (!eventData) return false;
+        history.replaceState(null, '', `#event-${id}`);
+        document.querySelectorAll('.event-card.is-chat-selected').forEach((card) => card.classList.remove('is-chat-selected'));
+        const card = document.querySelector(`[data-event-id="${CSS.escape(id)}"]`);
+        card?.classList.add('is-chat-selected');
+        window.setTimeout(() => card?.classList.remove('is-chat-selected'), 2400);
+        openEventModal(eventData);
+        return true;
+    }
+
     refs.joinBtn?.closest('form')?.addEventListener('submit', (event) => {
         event.preventDefault();
         reserveActiveTicket(event.currentTarget);
@@ -2045,6 +2179,7 @@ $renderEventCard = static function (array $card, string $modifier = '', bool $ea
     window.closeEventModal = closeEventModal;
     window.openEventModal = openEventModal;
     window.BadomenEventModalData = eventModalData;
+    window.BadomenOpenEventById = openEventById;
     openEventFromHash();
 })();
 
@@ -2076,7 +2211,8 @@ $renderEventCard = static function (array $card, string $modifier = '', bool $ea
             const data = await response.json();
             messages.querySelector('.is-loading')?.remove();
             const cards = (data.events || []).map(item => `<a href="${escapeHtml(item.url)}" data-chat-event-id="${escapeHtml(item.event_id || '')}"><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.summary)}</span><small>${escapeHtml(item.meta)}</small></a>`).join('');
-            messages.insertAdjacentHTML('beforeend', `<p>${escapeHtml(data.message || 'ไม่พบกิจกรรม')}</p>${cards}`);
+            const followups = (data.suggestions || []).map(prompt => `<button type="button" data-chat-inline-prompt="${escapeHtml(prompt)}">${escapeHtml(prompt)}</button>`).join('');
+            messages.insertAdjacentHTML('beforeend', `<p>${escapeHtml(data.message || 'ไม่พบกิจกรรม')}</p>${cards}${followups ? `<div class="home-event-chat__followups">${followups}</div>` : ''}`);
         } catch (_) {
             messages.querySelector('.is-loading')?.remove();
             messages.insertAdjacentHTML('beforeend', '<p>เชื่อมต่อผู้ช่วยไม่สำเร็จ</p>');
@@ -2087,15 +2223,24 @@ $renderEventCard = static function (array $card, string $modifier = '', bool $ea
     root.querySelector('[data-chat-close]').addEventListener('click', () => setOpen(false));
     document.querySelector('[data-open-event-chat]')?.addEventListener('click', () => setOpen(true));
     root.querySelectorAll('[data-chat-prompt]').forEach(button => button.addEventListener('click', () => send(button.dataset.chatPrompt)));
-    messages.addEventListener('click', event => {
+    messages.addEventListener('click', async event => {
         const link = event.target.closest('[data-chat-event-id]');
+        const promptButton = event.target.closest('[data-chat-inline-prompt]');
+        if (promptButton) {
+            send(promptButton.dataset.chatInlinePrompt || '');
+            return;
+        }
         if (!link) return;
-        const eventId = String(link.dataset.chatEventId || '');
-        const eventData = window.BadomenEventModalData?.[eventId];
-        if (!eventData || typeof window.openEventModal !== 'function') return;
         event.preventDefault();
+        const eventId = String(link.dataset.chatEventId || '');
+        if (!eventId) return;
+        link.classList.add('is-loading');
         setOpen(false);
-        window.openEventModal(eventData);
+        const opened = typeof window.BadomenOpenEventById === 'function'
+            ? await window.BadomenOpenEventById(eventId, link.href)
+            : false;
+        link.classList.remove('is-loading');
+        if (!opened) window.location.assign(link.href);
     });
     form.addEventListener('submit', event => {
         event.preventDefault();

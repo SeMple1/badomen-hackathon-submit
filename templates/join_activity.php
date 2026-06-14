@@ -334,11 +334,11 @@ $joinedEventDetailsJson = json_encode($joinedEventDetails, JSON_UNESCAPED_UNICOD
                                         <button type="button" class="join-button join-button--details" data-event-detail-open="<?= $activityId ?>">
                                             <i class="bx bx-map-alt"></i> ดูสถานที่และสถานะ
                                         </button>
-                                        <form method="POST" action="/join_activity#event-<?= $activityId ?>">
+                                        <form method="POST" action="/join_activity#event-<?= $activityId ?>" data-reminder-form>
                                             <?php if ($csrf !== ''): ?><input type="hidden" name="_csrf" value="<?= $escape($csrf) ?>"><?php endif; ?>
                                             <input type="hidden" name="action" value="toggle_email_reminder">
                                             <input type="hidden" name="event_id" value="<?= $activityId ?>">
-                                            <button type="submit" class="join-button <?= $reminderEnabled ? 'join-button--muted' : 'join-button--primary' ?>">
+                                            <button type="submit" class="join-button <?= $reminderEnabled ? 'join-button--muted' : 'join-button--primary' ?>" data-reminder-submit>
                                                 <i class="bx <?= $reminderEnabled ? 'bx-bell-off' : 'bx-bell' ?>"></i>
                                                 <?= $reminderEnabled ? 'ปิดแจ้งเตือน email' : 'แจ้งฉันด้วย email' ?>
                                             </button>
@@ -538,6 +538,8 @@ $joinedEventDetailsJson = json_encode($joinedEventDetails, JSON_UNESCAPED_UNICOD
     bindCancelModal();
     bindEventDetailModal();
     bindReviewModal();
+    restoreHeaderVisibility();
+    revealHashTarget();
 
     prevButton?.addEventListener('click', () => {
         const date = new Date(visibleYear, visibleMonth - 1, 1);
@@ -572,6 +574,8 @@ $joinedEventDetailsJson = json_encode($joinedEventDetails, JSON_UNESCAPED_UNICOD
         }
         renderCalendar();
         applyFilters();
+        restoreHeaderVisibility();
+        if (onlyUpcoming) animateUpcomingCards();
         smoothScrollTo(document.querySelector('.activity-panel'), 'start');
     });
 
@@ -582,7 +586,19 @@ $joinedEventDetailsJson = json_encode($joinedEventDetails, JSON_UNESCAPED_UNICOD
         renderCalendar();
         applyFilters();
         const firstCard = cards.find((card) => !card.classList.contains('is-hidden'));
+        if (firstCard?.dataset.eventUpcoming === '1') animateUpcomingCards();
         smoothScrollTo(firstCard, 'nearest');
+    });
+
+    document.addEventListener('click', (event) => {
+        const link = event.target.closest('a[href^="#event-"]');
+        if (!link) return;
+        const target = document.querySelector(link.getAttribute('href'));
+        if (!target) return;
+        event.preventDefault();
+        history.replaceState(null, '', link.getAttribute('href'));
+        smoothScrollTo(target, 'nearest');
+        markTargetCard(target);
     });
 
     statusButtons.forEach((button) => {
@@ -602,6 +618,11 @@ $joinedEventDetailsJson = json_encode($joinedEventDetails, JSON_UNESCAPED_UNICOD
         selectedSort = sortSelect.value || 'upcoming';
         sortCards();
         applyFilters();
+    });
+
+    window.addEventListener('pageshow', restoreHeaderVisibility);
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) restoreHeaderVisibility();
     });
 
     function parseEvents(raw) {
@@ -785,6 +806,17 @@ $joinedEventDetailsJson = json_encode($joinedEventDetails, JSON_UNESCAPED_UNICOD
             button.classList.toggle('is-active', onlyUpcoming);
             button.setAttribute('aria-pressed', onlyUpcoming ? 'true' : 'false');
         });
+    }
+
+    function animateUpcomingCards() {
+        const upcomingCards = cards.filter((card) => card.dataset.eventUpcoming === '1' && !card.classList.contains('is-hidden'));
+        upcomingCards.forEach((card, index) => {
+            card.classList.remove('is-upcoming-highlight');
+            window.setTimeout(() => card.classList.add('is-upcoming-highlight'), Math.min(index * 55, 440));
+        });
+        window.setTimeout(() => {
+            upcomingCards.forEach((card) => card.classList.remove('is-upcoming-highlight'));
+        }, 3400);
     }
 
     function sortCards() {
@@ -1158,6 +1190,15 @@ $joinedEventDetailsJson = json_encode($joinedEventDetails, JSON_UNESCAPED_UNICOD
                 node.removeAttribute('aria-hidden');
             }
         });
+        if (!anyModalOpen) restoreHeaderVisibility();
+    }
+
+    function restoreHeaderVisibility() {
+        document.querySelectorAll('#siteHeader, body > header, .site-header').forEach((header) => {
+            header.classList.remove('is-hidden');
+            header.removeAttribute('inert');
+            header.removeAttribute('aria-hidden');
+        });
     }
 
     function trapModalFocus(event, modal) {
@@ -1176,10 +1217,73 @@ $joinedEventDetailsJson = json_encode($joinedEventDetails, JSON_UNESCAPED_UNICOD
         }
     }
 
+    function scrollOffset() {
+        const header = document.querySelector('#siteHeader, header');
+        const headerHeight = header ? Math.min(92, Math.max(0, header.getBoundingClientRect().height || 0)) : 0;
+        return headerHeight + 28;
+    }
+
     function smoothScrollTo(target, block = 'start') {
         if (!target) return;
-        target.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block });
+        const rect = target.getBoundingClientRect();
+        const offset = scrollOffset();
+        const bottomSafe = 28;
+        if (block === 'nearest' && rect.top >= offset && rect.bottom <= window.innerHeight - bottomSafe) return;
+
+        let top = window.scrollY + rect.top - offset;
+        if (block === 'center') {
+            top = window.scrollY + rect.top - Math.max(offset, (window.innerHeight - rect.height) / 2);
+        }
+        window.scrollTo({
+            top: Math.max(0, Math.round(top)),
+            behavior: prefersReducedMotion ? 'auto' : 'smooth'
+        });
     }
+
+    function markTargetCard(card) {
+        if (!card) return;
+        cards.forEach((item) => item.classList.remove('is-scroll-target'));
+        card.classList.add('is-scroll-target');
+        window.setTimeout(() => card.classList.remove('is-scroll-target'), 2600);
+    }
+
+    function attachHashFeedback(card) {
+        if (!card) return;
+        const alert = document.querySelector('.join-alert');
+        if (!alert) return;
+        card.querySelector('.activity-inline-notice')?.remove();
+        const notice = document.createElement('div');
+        notice.className = 'activity-inline-notice ' + (alert.classList.contains('join-alert--error') ? 'is-error' : 'is-success');
+        notice.innerHTML = alert.innerHTML;
+        card.querySelector('.activity-content')?.prepend(notice);
+    }
+
+    function revealHashTarget() {
+        const match = window.location.hash.match(/^#event-(\d+)$/);
+        if (!match) return;
+        const target = document.getElementById(`event-${match[1]}`);
+        if (!target) return;
+        window.setTimeout(() => {
+            smoothScrollTo(target, 'nearest');
+            markTargetCard(target);
+            attachHashFeedback(target);
+        }, 90);
+    }
+
+    document.addEventListener('submit', (event) => {
+        const form = event.target.closest('[data-reminder-form]');
+        if (!form) return;
+
+        const button = form.querySelector('[data-reminder-submit]');
+        if (!button || button.classList.contains('is-loading')) return;
+
+        const isDisabling = button.classList.contains('join-button--muted');
+        button.dataset.originalLabel = button.innerHTML;
+        button.classList.add('is-loading');
+        button.setAttribute('aria-busy', 'true');
+        button.disabled = true;
+        button.innerHTML = `<i class="bx bx-loader-alt"></i>${isDisabling ? 'กำลังปิดแจ้งเตือน...' : 'กำลังตั้งแจ้งเตือน...'}`;
+    }, true);
 
     function formatDayLabel(ymd) {
         const date = parseYmd(ymd);

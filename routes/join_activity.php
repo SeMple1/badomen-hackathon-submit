@@ -830,7 +830,8 @@ function toggleEmailReminder(mysqli $conn, int $userId, array $event): array
     }
     $conn->commit();
 
-    $confirmation = sendGmailMessage(
+    $confirmationTemplate = buildReminderConfirmationEmail($title, $startText, $location, $remindAt, $actionUrl);
+    $confirmation = sendGmailMessageFromTemplate($confirmationTemplate,
         $email,
         'เปิดแจ้งเตือนแล้ว: ' . $title,
         'ระบบจะส่งอีเมลเตือนกิจกรรม "' . $title . '" ในวันที่ ' . $remindAt,
@@ -860,6 +861,66 @@ function calculateReminderTime(DateTimeImmutable $eventStart): DateTimeImmutable
 
     $oneHourBefore = $eventStart->modify('-1 hour');
     return $oneHourBefore > $now ? $oneHourBefore : $now->modify('+5 minutes');
+}
+
+function buildReminderConfirmationEmail(string $title, string $startText, string $location, string $remindAt, string $actionUrl): array
+{
+    $displayTitle = trim($title) !== '' ? trim($title) : 'กิจกรรม';
+    $displayLocation = trim($location);
+    $safeTitle = htmlspecialchars($displayTitle, ENT_QUOTES, 'UTF-8');
+    $safeStart = htmlspecialchars($startText, ENT_QUOTES, 'UTF-8');
+    $safeRemindAt = htmlspecialchars($remindAt, ENT_QUOTES, 'UTF-8');
+    $safeLocation = htmlspecialchars($displayLocation !== '' ? $displayLocation : 'รอประกาศสถานที่', ENT_QUOTES, 'UTF-8');
+    $absoluteActionUrl = function_exists('appAbsoluteUrl') ? appAbsoluteUrl($actionUrl) : appUrl($actionUrl);
+    $safeUrl = htmlspecialchars($absoluteActionUrl, ENT_QUOTES, 'UTF-8');
+    $hackathonNote = 'หากท่านไม่ได้เข้าร่วมกิจกรรมแต่ได้รับจดหมายนี้ ทางทีมงานขออภัยอย่างสูง อีเมลฉบับนี้ถูกส่งโดยระบบต้นแบบสำหรับ Hackathon เพื่อทดสอบ flow การยืนยันสิทธิ์และการแจ้งเตือน กรุณาเพิกเฉยต่ออีเมลนี้ หรือแจ้งผู้จัดกิจกรรมให้ตรวจสอบข้อมูล';
+    $safeNote = htmlspecialchars($hackathonNote, ENT_QUOTES, 'UTF-8');
+
+    $text = "เปิดแจ้งเตือนกิจกรรมแล้ว\n\n"
+        . "กิจกรรม: {$displayTitle}\n"
+        . "วันเริ่มกิจกรรม: {$startText}\n"
+        . "สถานที่: " . ($displayLocation !== '' ? $displayLocation : 'รอประกาศสถานที่') . "\n"
+        . "ระบบจะส่งอีเมลเตือนอีกครั้งประมาณ: {$remindAt}\n\n"
+        . "ดูรายละเอียด: " . $absoluteActionUrl . "\n\n"
+        . $hackathonNote;
+
+    $html = '<div style="margin:0;padding:0;background:#fff7ed;font-family:Arial,Helvetica,sans-serif;color:#1f2937">'
+        . '<div style="max-width:640px;margin:0 auto;padding:28px 16px">'
+        . '<div style="overflow:hidden;border-radius:24px;background:#ffffff;border:1px solid #fed7aa;box-shadow:0 24px 60px rgba(194,65,12,.14)">'
+        . '<div style="padding:28px;background:linear-gradient(135deg,#ea580c,#c2410c);color:#ffffff">'
+        . '<div style="font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;opacity:.88">GMAIL REMINDER</div>'
+        . '<h1 style="margin:10px 0 0;font-size:28px;line-height:1.25">เปิดแจ้งเตือนกิจกรรมแล้ว</h1>'
+        . '<p style="margin:12px 0 0;font-size:15px;line-height:1.65;opacity:.92">เราจะช่วยเตือนคุณก่อนถึงเวลากิจกรรม</p>'
+        . '</div>'
+        . '<div style="padding:28px">'
+        . '<p style="margin:0 0 18px;font-size:16px;line-height:1.7">ระบบเปิดแจ้งเตือนผ่าน Gmail สำหรับ <strong>' . $safeTitle . '</strong> เรียบร้อยแล้ว</p>'
+        . '<div style="display:block;margin:20px 0;padding:18px;border-radius:18px;background:#fff7ed;border:1px solid #fed7aa">'
+        . '<div style="margin-bottom:10px;font-size:13px;line-height:1.6;color:#9a3412"><strong>เริ่มกิจกรรม:</strong> ' . $safeStart . '</div>'
+        . '<div style="margin-bottom:10px;font-size:13px;line-height:1.6;color:#9a3412"><strong>สถานที่:</strong> ' . $safeLocation . '</div>'
+        . '<div style="font-size:13px;line-height:1.6;color:#9a3412"><strong>เวลาที่จะเตือน:</strong> ' . $safeRemindAt . '</div>'
+        . '</div>'
+        . '<a href="' . $safeUrl . '" style="display:inline-block;padding:13px 18px;border-radius:14px;background:#ea580c;color:#ffffff;text-decoration:none;font-weight:800">เปิดกิจกรรมของฉัน</a>'
+        . '<p style="margin:24px 0 0;font-size:13px;line-height:1.7;color:#64748b">' . $safeNote . '</p>'
+        . '</div>'
+        . '</div>'
+        . '</div>'
+        . '</div>';
+
+    return [
+        'subject' => 'เปิดแจ้งเตือนแล้ว: ' . $displayTitle,
+        'text' => $text,
+        'html' => $html,
+    ];
+}
+
+function sendGmailMessageFromTemplate(array $template, string $email, ...$unused): array
+{
+    return sendGmailMessage(
+        $email,
+        (string)($template['subject'] ?? 'เปิดแจ้งเตือนกิจกรรมแล้ว'),
+        (string)($template['text'] ?? ''),
+        (string)($template['html'] ?? '')
+    );
 }
 
 function outputJoinedEventIcs(mysqli $conn, int $userId, int $eventId, ?string $statusColumn): void

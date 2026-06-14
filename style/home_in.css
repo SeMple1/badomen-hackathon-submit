@@ -628,6 +628,52 @@ body.modal-open {
     background: linear-gradient(180deg, transparent, rgba(15, 23, 42, .62));
 }
 
+.new-event-chip {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 10px;
+    border: 1px solid rgba(255, 255, 255, .42);
+    border-radius: 999px;
+    color: #fff7ed;
+    background: linear-gradient(135deg, rgba(234, 88, 12, .94), rgba(194, 65, 12, .92));
+    box-shadow: 0 12px 28px rgba(194, 65, 12, .32);
+    font-size: 11px;
+    font-weight: 950;
+    letter-spacing: .02em;
+}
+
+.new-event-chip i {
+    font-size: 13px;
+}
+
+.event-card--new {
+    border-color: rgba(249, 115, 22, .36);
+}
+
+.event-card.is-live-new {
+    animation: liveNewCardPulse 3.2s ease both;
+}
+
+@keyframes liveNewCardPulse {
+    0% {
+        border-color: rgba(251, 146, 60, .86);
+        box-shadow: 0 0 0 0 rgba(251, 146, 60, .34), var(--hi-shadow-sm);
+        transform: translateY(-2px);
+    }
+    55% {
+        box-shadow: 0 0 0 10px rgba(251, 146, 60, 0), var(--hi-shadow-md);
+    }
+    100% {
+        box-shadow: var(--hi-shadow-sm);
+        transform: translateY(0);
+    }
+}
+
 .date-chip {
     position: absolute;
     left: 16px;
@@ -2713,9 +2759,54 @@ footer {
 .home-event-chat__messages .is-user { justify-self: end; color: #fff; background: #ea580c; }
 .home-event-chat__messages a { display: grid; gap: 4px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 14px; color: #0f172a; background: #fff; text-decoration: none; }
 .home-event-chat__messages a:hover { border-color: #fb923c; background: #fff7ed; }
+.home-event-chat__messages a.is-loading { border-color: #fb923c; color: #9a3412; background: #fff7ed; cursor: progress; opacity: .82; }
 .home-event-chat__messages a span,.home-event-chat__messages a small { color: #64748b; font-size: 11px; line-height: 1.45; }
-.home-event-chat__suggestions { display: flex; gap: 7px; padding: 0 14px 10px; }
-.home-event-chat__suggestions button { padding: 7px 10px; border: 1px solid #fed7aa; border-radius: 999px; color: #9a3412; background: #fff7ed; font-size: 11px; font-weight: 800; cursor: pointer; }
+.home-event-chat__suggestions {
+    display: flex;
+    gap: 7px;
+    max-width: 100%;
+    padding: 0 14px 10px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+}
+.home-event-chat__suggestions button {
+    flex: 0 0 auto;
+    max-width: 150px;
+    padding: 7px 10px;
+    overflow: hidden;
+    border: 1px solid #fed7aa;
+    border-radius: 999px;
+    color: #9a3412;
+    background: #fff7ed;
+    font-size: 11px;
+    font-weight: 800;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+}
+.home-event-chat__followups {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+}
+.home-event-chat__followups button {
+    min-width: 0;
+    padding: 8px 9px;
+    overflow: hidden;
+    border: 1px solid #c7d2fe;
+    border-radius: 12px;
+    color: #3730a3;
+    background: #eef2ff;
+    font-size: 11px;
+    font-weight: 850;
+    line-height: 1.25;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+}
+.home-event-chat__followups button:hover { border-color: #818cf8; background: #e0e7ff; }
 .home-event-chat__panel form { display: grid; grid-template-columns: 1fr 46px; gap: 8px; padding: 12px; border-top: 1px solid #e2e8f0; }
 .home-event-chat__panel input { min-width: 0; min-height: 44px; padding: 0 12px; border: 1px solid #cbd5e1; border-radius: 12px; outline: 0; }
 .home-event-chat__panel input:focus { border-color: #ea580c; box-shadow: 0 0 0 3px rgba(234,88,12,.12); }
@@ -2723,6 +2814,11 @@ footer {
 @media (max-width: 560px) { .home-event-chat { right: 14px; bottom: 14px; } .home-event-chat__toggle span { display: none; } .home-event-chat__toggle { width: 56px; padding: 0; justify-content: center; } }
 @keyframes aiBorderFlow { to { background-position: 0 0, 260% 50%; } }
 @media (prefers-reduced-motion: reduce) { .home-event-chat__toggle { animation: none !important; } }
+
+.event-card.is-chat-selected {
+    border-color: rgba(249, 115, 22, .62);
+    box-shadow: 0 20px 46px rgba(249, 115, 22, .18), 0 1px 2px rgba(15, 23, 42, .06);
+}
 
 
 /* =========================================================

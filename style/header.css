@@ -701,6 +701,35 @@ body {
     -webkit-appearance: none;
 }
 
+.site-account__button.has-unread,
+.site-account__item.has-unread,
+.site-mobile-menu button[data-notification-open].has-unread {
+    position: relative;
+}
+
+.site-account__button.has-unread::after,
+.site-account__item.has-unread::after,
+.site-mobile-menu button[data-notification-open].has-unread::after {
+    content: "";
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 9px;
+    height: 9px;
+    border: 2px solid rgba(15, 23, 42, .96);
+    border-radius: 999px;
+    background: #ef4444;
+    box-shadow: 0 0 0 4px rgba(239, 68, 68, .16);
+}
+
+.site-account__item.has-unread::after,
+.site-mobile-menu button[data-notification-open].has-unread::after {
+    top: 50%;
+    right: 14px;
+    transform: translateY(-50%);
+    border-color: rgba(15, 23, 42, .88);
+}
+
 .site-mobile-menu button[data-notification-open] {
     border: 1px solid transparent;
 }
@@ -729,8 +758,9 @@ body {
     opacity: 0;
     transition: opacity .2s ease, visibility .2s ease;
 }
+.notification-popup[hidden] { display: none !important; }
 .notification-popup.is-open { visibility: visible; opacity: 1; }
-.notification-popup__backdrop { position: absolute; inset: 0; background: rgba(15, 23, 42, .58); backdrop-filter: blur(5px); }
+.notification-popup__backdrop { position: absolute; inset: 0; background: rgba(15, 23, 42, .58); }
 .notification-popup__panel {
     position: relative;
     z-index: 1;
@@ -740,6 +770,7 @@ body {
     border-radius: 26px;
     background: #fff;
     box-shadow: 0 30px 80px rgba(15, 23, 42, .28);
+    contain: layout paint;
 }
 .notification-popup__panel > header,
 .notification-popup__panel > footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 22px; }
@@ -747,8 +778,8 @@ body {
 .notification-popup__panel > header span { color: #2563eb; font-size: 11px; font-weight: 900; letter-spacing: .12em; }
 .notification-popup__panel h2 { margin: 3px 0 0; color: #0f172a; }
 .notification-popup__panel > header button { border: 0; background: transparent; color: #64748b; font-size: 28px; cursor: pointer; }
-.notification-popup__list { overflow-y: auto; max-height: 540px; padding: 10px; }
-.notification-popup__item { display: block; margin: 6px; padding: 14px; border: 1px solid #e2e8f0; border-radius: 16px; color: #0f172a; background: #fff; }
+.notification-popup__list { overflow-y: auto; max-height: 540px; padding: 10px; contain: content; }
+.notification-popup__item { display: block; margin: 6px; padding: 14px; border: 1px solid #e2e8f0; border-radius: 16px; color: #0f172a; background: #fff; contain: layout paint; }
 .notification-popup__item.is-unread { border-color: #bfdbfe; background: #eff6ff; }
 .notification-popup__item strong, .notification-popup__item time { display: block; }
 .notification-popup__item p { margin: 5px 0; color: #475569; line-height: 1.5; }

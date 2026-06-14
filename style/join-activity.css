@@ -58,14 +58,6 @@
 }
 
 
-.join-activity-page.is-upcoming-mode > header,
-.join-activity-page.is-upcoming-mode .topbar,
-.join-activity-page.is-upcoming-mode .site-topbar,
-.join-activity-page.is-upcoming-mode .app-topbar,
-.join-activity-page.is-upcoming-mode .main-topbar {
-    display: none !important;
-}
-
 .join-hero {
     position: relative;
     overflow: hidden;
@@ -573,6 +565,7 @@
 }
 
 .activity-card {
+    position: relative;
     display: flex;
     content-visibility: auto;
     contain-intrinsic-size: 240px;
@@ -582,6 +575,66 @@
     border-radius: 24px;
     background: #fff;
     box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+    transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+    scroll-margin-top: 112px;
+}
+
+.activity-card.is-scroll-target {
+    border-color: rgba(249, 115, 22, .55);
+    box-shadow: 0 18px 42px rgba(249, 115, 22, .16), 0 1px 2px rgba(15, 23, 42, .04);
+}
+
+.activity-card.is-upcoming-highlight {
+    border: 2px solid transparent;
+    background:
+        linear-gradient(#fff, #fff) padding-box,
+        conic-gradient(from var(--upcoming-border-angle, 0deg), #fb923c, #facc15, #38bdf8, #a78bfa, #fb923c) border-box;
+    box-shadow: 0 20px 52px rgba(251, 146, 60, .18), 0 1px 2px rgba(15, 23, 42, .04);
+    animation: upcomingBorderSpin 1.35s linear infinite, upcomingBorderFade 3.2s ease both;
+}
+
+@property --upcoming-border-angle {
+    syntax: "<angle>";
+    inherits: false;
+    initial-value: 0deg;
+}
+
+@keyframes upcomingBorderSpin {
+    to { --upcoming-border-angle: 360deg; }
+}
+
+@keyframes upcomingBorderFade {
+    0% { filter: saturate(1); }
+    12%, 78% { filter: saturate(1.25); }
+    100% { filter: saturate(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .activity-card.is-upcoming-highlight {
+        animation: none;
+    }
+}
+
+.activity-inline-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 11px 13px;
+    border-radius: 15px;
+    font-size: 13px;
+    font-weight: 850;
+}
+
+.activity-inline-notice.is-success {
+    color: #047857;
+    background: #ecfdf5;
+    border: 1px solid rgba(5, 150, 105, .20);
+}
+
+.activity-inline-notice.is-error {
+    color: #b91c1c;
+    background: #fef2f2;
+    border: 1px solid rgba(239, 68, 68, .20);
 }
 
 .activity-card.is-hidden {
@@ -915,6 +968,19 @@
     background: #e2e8f0;
 }
 
+.join-button.is-loading {
+    cursor: wait;
+    opacity: .88;
+    pointer-events: none;
+}
+
+.join-button.is-loading i {
+    animation: joinButtonSpin .8s linear infinite;
+}
+
+@keyframes joinButtonSpin {
+    to { transform: rotate(360deg); }
+}
 
 .join-button:disabled,
 .join-button[aria-disabled="true"],

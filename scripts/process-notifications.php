@@ -11,6 +11,7 @@ require_once dirname(__DIR__) . '/includes/config.php';
 require_once dirname(__DIR__) . '/includes/database.php';
 require_once dirname(__DIR__) . '/includes/schema.php';
 require_once dirname(__DIR__) . '/includes/gmail.php';
+require_once dirname(__DIR__) . '/includes/url.php';
 
 $conn = getConnection();
 if (!databaseTableExists($conn, 'notification_deliveries')) {
@@ -20,7 +21,7 @@ if (!databaseTableExists($conn, 'notification_deliveries')) {
 }
 
 $result = $conn->query(
-    "SELECT d.delivery_id, d.recipient, n.title_th, n.title_en, n.body_th, n.body_en, u.locale
+    "SELECT d.delivery_id, d.recipient, n.title_th, n.title_en, n.body_th, n.body_en, n.action_url, u.locale
      FROM notification_deliveries d
      JOIN notifications n ON n.notification_id = d.notification_id
      JOIN users u ON u.user_id = n.user_id
@@ -46,11 +47,22 @@ foreach ($jobs as $job) {
     $locale = (string)($job['locale'] ?? 'th');
     $subject = $locale === 'en' ? (string)$job['title_en'] : (string)$job['title_th'];
     $body = $locale === 'en' ? (string)$job['body_en'] : (string)$job['body_th'];
+    $actionUrl = trim((string)($job['action_url'] ?? ''));
+    $absoluteActionUrl = $actionUrl !== '' ? appAbsoluteUrl($actionUrl) : '';
+    $textBody = $body . ($absoluteActionUrl !== '' ? "\n\n" . $absoluteActionUrl : '');
+    $htmlBody = '<div style="font-family:Arial,sans-serif;line-height:1.7">'
+        . nl2br(htmlspecialchars($body, ENT_QUOTES, 'UTF-8'));
+    if ($absoluteActionUrl !== '') {
+        $safeActionUrl = htmlspecialchars($absoluteActionUrl, ENT_QUOTES, 'UTF-8');
+        $htmlBody .= '<p style="margin:18px 0 0"><a href="' . $safeActionUrl . '" style="display:inline-block;padding:12px 16px;border-radius:12px;background:#2563eb;color:#ffffff;text-decoration:none;font-weight:800">Open event</a></p>'
+            . '<p style="margin:10px 0 0;color:#64748b;font-size:12px">' . $safeActionUrl . '</p>';
+    }
+    $htmlBody .= '</div>';
     $mail = sendGmailMessage(
         (string)$job['recipient'],
         $subject,
-        $body,
-        '<div style="font-family:Arial,sans-serif;line-height:1.7">' . nl2br(htmlspecialchars($body, ENT_QUOTES, 'UTF-8')) . '</div>'
+        $textBody,
+        $htmlBody
     );
 
     $status = $mail['ok'] ? 'sent' : 'failed';

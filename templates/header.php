@@ -5,6 +5,7 @@ $headerDisplayName = trim((string)($_SESSION['user_name'] ?? 'บัญชีข
 $headerInitial = $headerDisplayName !== '' ? mb_substr($headerDisplayName, 0, 1, 'UTF-8') : 'B';
 $headerAvatarUrl = '';
 $headerIsGold = false;
+$headerUnreadNotifications = 0;
 $headerEscape = static fn(string $value): string => htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
 $headerNormalizeImagePath = static function (?string $path): string {
     $path = trim((string)$path);
@@ -28,6 +29,28 @@ if ($headerAuthenticated && function_exists('badomenFetchVipProfile')) {
     } catch (Throwable) {
         $headerAvatarUrl = '';
         $headerIsGold = false;
+    }
+}
+if ($headerAuthenticated && function_exists('databaseTableExists')) {
+    try {
+        $headerConn = getConnection();
+        if (databaseTableExists($headerConn, 'notifications')) {
+            $headerUnreadStmt = $headerConn->prepare(
+                'SELECT COUNT(*) AS unread_count
+                 FROM notifications
+                 WHERE user_id = ? AND read_at IS NULL AND (expires_at IS NULL OR expires_at > NOW())'
+            );
+            if ($headerUnreadStmt !== false) {
+                $headerUserId = (int)$_SESSION['user_id'];
+                $headerUnreadStmt->bind_param('i', $headerUserId);
+                $headerUnreadStmt->execute();
+                $headerUnreadNotifications = (int)($headerUnreadStmt->get_result()->fetch_assoc()['unread_count'] ?? 0);
+                $headerUnreadStmt->close();
+            }
+        }
+        $headerConn->close();
+    } catch (Throwable) {
+        $headerUnreadNotifications = 0;
     }
 }
 $headerIsActive = static function (array $paths) use ($headerCurrentPath): bool {
@@ -99,7 +122,7 @@ $headerAriaCurrent = static fn(array $paths): string => $headerIsActive($paths) 
             <div class="site-header__actions">
                 <?php if ($headerAuthenticated): ?>
                     <div class="site-account" data-account-menu>
-                        <button class="site-account__button" type="button" data-account-button
+                        <button class="site-account__button<?= $headerUnreadNotifications > 0 ? ' has-unread' : '' ?>" type="button" data-account-button
                             aria-haspopup="true" aria-expanded="false">
                             <span class="site-account__avatar<?= $headerIsGold ? ' is-gold' : '' ?>"><?php if ($headerAvatarUrl !== ''): ?><img src="<?= $headerEscape($headerAvatarUrl) ?>" alt="รูปโปรไฟล์" onerror="this.remove()"><?php else: ?><?= $headerEscape($headerInitial) ?><?php endif; ?></span>
                             <span class="site-account__copy">
@@ -117,7 +140,7 @@ $headerAriaCurrent = static fn(array $paths): string => $headerIsActive($paths) 
                                     <small><?= $headerEscape((string)($_SESSION['user_email'] ?? '')) ?></small>
                                 </div>
                             </div>
-                            <button class="site-account__item<?= $headerActiveClass(['/notifications']) ?>" type="button" data-notification-open<?= $headerAriaCurrent(['/notifications']) ?>>
+                            <button class="site-account__item<?= $headerActiveClass(['/notifications']) ?><?= $headerUnreadNotifications > 0 ? ' has-unread' : '' ?>" type="button" data-notification-open data-unread-count="<?= (int)$headerUnreadNotifications ?>"<?= $headerAriaCurrent(['/notifications']) ?>>
                                 <i class="fa-regular fa-bell" aria-hidden="true"></i><span>การแจ้งเตือน</span>
                             </button>
                             <a class="site-account__item<?= $headerActiveClass(['/join_activity', '/my_activity', '/tickets', '/my_tickets']) ?>" href="/join_activity"<?= $headerAriaCurrent(['/join_activity', '/my_activity', '/tickets', '/my_tickets']) ?>>
@@ -171,7 +194,7 @@ $headerAriaCurrent = static fn(array $paths): string => $headerIsActive($paths) 
                 <a class="<?= $headerActiveClass(['/join_activity', '/my_activity', '/tickets', '/my_tickets']) ?>" href="/join_activity"<?= $headerAriaCurrent(['/join_activity', '/my_activity', '/tickets', '/my_tickets']) ?>><i class="fa-solid fa-calendar-check" aria-hidden="true"></i><span>กิจกรรมของฉัน</span></a>
                 <a class="<?= $headerActiveClass(['/dashboard', '/editing_activity', '/participants']) ?>" href="/dashboard"<?= $headerAriaCurrent(['/dashboard', '/editing_activity', '/participants']) ?>><i class="fa-solid fa-chart-line" aria-hidden="true"></i><span>จัดการกิจกรรม</span></a>
                 <a class="<?= $headerActiveClass(['/create_activity']) ?>" href="/create_activity"<?= $headerAriaCurrent(['/create_activity']) ?>><i class="fa-solid fa-plus" aria-hidden="true"></i><span>สร้างกิจกรรมใหม่</span></a>
-                <button class="<?= $headerActiveClass(['/notifications']) ?>" type="button" data-notification-open<?= $headerAriaCurrent(['/notifications']) ?>><i class="fa-regular fa-bell" aria-hidden="true"></i><span>การแจ้งเตือน</span></button>
+                <button class="<?= $headerActiveClass(['/notifications']) ?><?= $headerUnreadNotifications > 0 ? ' has-unread' : '' ?>" type="button" data-notification-open data-unread-count="<?= (int)$headerUnreadNotifications ?>"<?= $headerAriaCurrent(['/notifications']) ?>><i class="fa-regular fa-bell" aria-hidden="true"></i><span>การแจ้งเตือน</span></button>
                 <a class="<?= $headerActiveClass(['/profile', '/edit_profile']) ?>" href="/profile"<?= $headerAriaCurrent(['/profile', '/edit_profile']) ?>><i class="fa-regular fa-user" aria-hidden="true"></i><span>โปรไฟล์</span></a>
                 <a class="<?= $headerActiveClass(['/vip']) ?>" href="/vip"<?= $headerAriaCurrent(['/vip']) ?>><i class="fa-solid fa-crown" aria-hidden="true"></i><span>Gold VIP</span></a>
                 <a class="site-mobile-menu__danger" href="/logout">
@@ -191,7 +214,7 @@ $headerAriaCurrent = static fn(array $paths): string => $headerIsActive($paths) 
 </header>
 
 <?php if ($headerAuthenticated): ?>
-<div class="notification-popup" id="notificationPopup" aria-hidden="true">
+<div class="notification-popup" id="notificationPopup" aria-hidden="true" hidden>
     <div class="notification-popup__backdrop" data-notification-close></div>
     <section class="notification-popup__panel" role="dialog" aria-modal="true" aria-labelledby="notificationPopupTitle">
         <header>
@@ -225,6 +248,10 @@ $headerAriaCurrent = static fn(array $paths): string => $headerIsActive($paths) 
     const notificationList = document.getElementById('notificationPopupList');
     const notificationMarkRead = document.getElementById('notificationMarkRead');
     let notificationCsrf = '';
+    let notificationLoading = null;
+    let notificationCache = null;
+    let notificationCacheAt = 0;
+    let notificationRenderKey = '';
     let lastScrollY = window.scrollY;
     let scrollFrame = 0;
 
@@ -244,16 +271,37 @@ $headerAriaCurrent = static fn(array $paths): string => $headerIsActive($paths) 
     const closeNotifications = () => {
         notificationPopup?.classList.remove('is-open');
         notificationPopup?.setAttribute('aria-hidden', 'true');
+        if (notificationPopup) notificationPopup.hidden = true;
         document.body.classList.remove('notification-open');
+    };
+
+    const setNotificationUnread = (count) => {
+        const unread = Number(count || 0) > 0;
+        document.querySelectorAll('[data-notification-open], [data-account-button]').forEach((button) => {
+            button.classList.toggle('has-unread', unread);
+            if (button.hasAttribute('data-notification-open')) {
+                button.dataset.unreadCount = unread ? String(count) : '0';
+            }
+        });
     };
 
     const renderNotifications = (items) => {
         if (!notificationList) return;
-        notificationList.textContent = '';
+        const nextKey = JSON.stringify((items || []).slice(0, 20).map((item) => [
+            item.id,
+            item.read ? 1 : 0,
+            item.title,
+            item.body,
+            item.created_at
+        ]));
+        if (nextKey === notificationRenderKey) return;
+        notificationRenderKey = nextKey;
+        notificationList.replaceChildren();
         if (!items.length) {
             notificationList.innerHTML = '<p class="notification-popup__empty">ยังไม่มีการแจ้งเตือน</p>';
             return;
         }
+        const fragment = document.createDocumentFragment();
         items.slice(0, 20).forEach((item) => {
             const link = document.createElement('a');
             link.href = item.action_url || '/notifications';
@@ -265,24 +313,63 @@ $headerAriaCurrent = static fn(array $paths): string => $headerIsActive($paths) 
             const time = document.createElement('time');
             time.textContent = item.created_at;
             link.append(strong, body, time);
-            notificationList.appendChild(link);
+            fragment.appendChild(link);
         });
+        notificationList.appendChild(fragment);
+    };
+
+    const loadNotifications = async () => {
+        if (notificationLoading) return notificationLoading;
+        if (notificationCache && Date.now() - notificationCacheAt < 15000) return notificationCache;
+        notificationLoading = fetch('/notifications?format=json', {
+            headers: { Accept: 'application/json' },
+            credentials: 'same-origin'
+        })
+            .then((response) => response.json())
+            .then((data) => {
+                notificationCache = data;
+                notificationCacheAt = Date.now();
+                return data;
+            })
+            .finally(() => {
+                notificationLoading = null;
+            });
+        return notificationLoading;
+    };
+
+    const markAllNotificationsRead = async () => {
+        if (!notificationCsrf) return;
+        await fetch('/notifications', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            credentials: 'same-origin',
+            body: new URLSearchParams({ _csrf: notificationCsrf })
+        });
+        notificationCache = null;
+        notificationRenderKey = '';
+        setNotificationUnread(0);
     };
 
     const openNotifications = async () => {
         closeAccount();
         closeMobile();
+        if (notificationPopup) notificationPopup.hidden = false;
         notificationPopup?.classList.add('is-open');
         notificationPopup?.setAttribute('aria-hidden', 'false');
         document.body.classList.add('notification-open');
         try {
-            const response = await fetch('/notifications?format=json', {
-                headers: { Accept: 'application/json' },
-                credentials: 'same-origin'
-            });
-            const data = await response.json();
+            const data = await loadNotifications();
             notificationCsrf = data.csrf || '';
-            renderNotifications(data.notifications || []);
+            const notifications = (data.notifications || []).map((item) => ({ ...item, read: true }));
+            setNotificationUnread(0);
+            renderNotifications(notifications);
+            if (Number(data.unread_count || 0) > 0) {
+                markAllNotificationsRead().catch(() => {});
+            }
         } catch (_) {
             if (notificationList) notificationList.innerHTML = '<p class="notification-popup__empty">โหลดการแจ้งเตือนไม่สำเร็จ</p>';
         }
@@ -319,13 +406,7 @@ $headerAriaCurrent = static fn(array $paths): string => $headerIsActive($paths) 
     document.querySelectorAll('[data-notification-open]').forEach((button) => button.addEventListener('click', openNotifications));
     document.querySelectorAll('[data-notification-close]').forEach((button) => button.addEventListener('click', closeNotifications));
     notificationMarkRead?.addEventListener('click', async () => {
-        if (!notificationCsrf) return;
-        await fetch('/notifications', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
-            credentials: 'same-origin',
-            body: new URLSearchParams({ _csrf: notificationCsrf })
-        });
+        await markAllNotificationsRead();
         notificationList?.querySelectorAll('.is-unread').forEach((item) => item.classList.remove('is-unread'));
     });
     document.getElementById('appFeedbackOpen')?.addEventListener('click', () => {

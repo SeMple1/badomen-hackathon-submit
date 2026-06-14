@@ -10,7 +10,8 @@ $conn = getConnection();
 $available = databaseTableExists($conn, 'notifications');
 $userId = (int)$_SESSION['user_id'];
 $wantsJson = strtolower((string)($_GET['format'] ?? '')) === 'json'
-    || str_contains((string)($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json');
+    || str_contains((string)($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json')
+    || strtolower((string)($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '')) === 'xmlhttprequest';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!verifyCsrfToken($_POST['_csrf'] ?? null)) {
@@ -27,6 +28,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     $conn->close();
+    if ($wantsJson) {
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
     redirectTo('/notifications');
 }
 
@@ -49,10 +55,15 @@ if ($available) {
 $conn->close();
 
 if ($wantsJson) {
+    $unreadCount = 0;
+    foreach ($notifications as $notification) {
+        if (empty($notification['read_at'])) $unreadCount++;
+    }
     header('Content-Type: application/json; charset=UTF-8');
     echo json_encode([
         'ok' => true,
         'available' => $available,
+        'unread_count' => $unreadCount,
         'notifications' => array_map(static function (array $notification): array {
             return [
                 'id' => (int)$notification['notification_id'],

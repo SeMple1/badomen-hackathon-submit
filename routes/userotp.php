@@ -112,6 +112,10 @@ function renderUserOtpPage(int $eventId, bool $isRequestingNewOtp = false): void
     $isPending = false;
     $isCheckedIn = false;
     $isRejected = false;
+    $isOutsideEventWindow = false;
+    $eventWindowWarning = '';
+    $requiresOutsideWindowConfirm = false;
+    $confirmedOutsideWindow = (string)($_POST['confirm_outside_window'] ?? '') === '1';
 
     $ttlSeconds = 30 * 60;     // 30 นาที
     $cooldownSeconds = 3 * 60; // 3 นาที
@@ -120,7 +124,7 @@ function renderUserOtpPage(int $eventId, bool $isRequestingNewOtp = false): void
     $conn = getConnection();
 
     // 1) เช็ค event มีจริง
-    $eventStmt = $conn->prepare('SELECT event_id, creator_id, title FROM events WHERE event_id = ? LIMIT 1');
+    $eventStmt = $conn->prepare('SELECT event_id, creator_id, title, event_start, event_end FROM events WHERE event_id = ? LIMIT 1');
     if ($eventStmt === false) {
         $conn->close();
         renderView('userotp', [
@@ -146,6 +150,17 @@ function renderUserOtpPage(int $eventId, bool $isRequestingNewOtp = false): void
         $conn->close();
         header('Location: ' . appUrl('/join_activity'));
         exit;
+    }
+
+    $eventStart = parseUserOtpDateTime((string)($event['event_start'] ?? ''));
+    $eventEnd = parseUserOtpDateTime((string)($event['event_end'] ?? ''));
+    $nowDate = new DateTimeImmutable('now', new DateTimeZone('Asia/Bangkok'));
+    if ($eventStart instanceof DateTimeImmutable && $nowDate < $eventStart) {
+        $isOutsideEventWindow = true;
+        $eventWindowWarning = 'ยังไม่ถึงช่วงวัน/เวลาของกิจกรรมนี้ ต้องการขอหรือกรอก OTP ตอนนี้แน่นอนใช่ไหม?';
+    } elseif ($eventEnd instanceof DateTimeImmutable && $nowDate > $eventEnd) {
+        $isOutsideEventWindow = true;
+        $eventWindowWarning = 'กิจกรรมนี้เลยช่วงวัน/เวลาที่กำหนดแล้ว ต้องการขอหรือกรอก OTP ตอนนี้แน่นอนใช่ไหม?';
     }
 
     // 2) เช็คว่า user นี้เคย request/join event นี้จริงหรือไม่ (ถ้าไม่เคย -> ไม่ต้องโชว์ error ให้ user งง -> ส่งกลับ)
@@ -188,6 +203,14 @@ function renderUserOtpPage(int $eventId, bool $isRequestingNewOtp = false): void
         if (is_array($decoded)) {
             $record = $decoded;
         }
+    }
+
+    if ($isRequestingNewOtp && $isOutsideEventWindow && !$confirmedOutsideWindow) {
+        $requiresOutsideWindowConfirm = true;
+        if ($eventWindowWarning !== '') {
+            $info[] = $eventWindowWarning;
+        }
+        $isRequestingNewOtp = false;
     }
 
     // 4) ถ้ากดขอ OTP (POST) และไม่มี error -> สร้างตามกฎ cooldown
@@ -254,6 +277,22 @@ function renderUserOtpPage(int $eventId, bool $isRequestingNewOtp = false): void
         'is_pending' => !empty($isPending),
         'is_rejected' => !empty($isRejected),
         'is_checked_in' => !empty($isCheckedIn),
+        'is_outside_event_window' => $isOutsideEventWindow,
+        'event_window_warning' => $eventWindowWarning,
+        'requires_outside_window_confirm' => $requiresOutsideWindowConfirm,
         'cooldown_seconds' => $cooldownSeconds,
     ]);
+}
+
+function parseUserOtpDateTime(string $value): ?DateTimeImmutable
+{
+    $value = trim($value);
+    if ($value === '') return null;
+
+    $tz = new DateTimeZone('Asia/Bangkok');
+    $date = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $value, $tz);
+    if ($date instanceof DateTimeImmutable) return $date;
+
+    $fallback = date_create_immutable($value, $tz);
+    return $fallback instanceof DateTimeImmutable ? $fallback : null;
 }

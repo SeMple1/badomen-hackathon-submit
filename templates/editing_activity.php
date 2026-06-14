@@ -37,7 +37,7 @@ foreach ($existingImages as $image) {
     <title>แก้ไขกิจกรรม | Badomen</title>
 
     <link rel="stylesheet" href="/style/app.css">
-    <link rel="stylesheet" href="/style/editing-activity.css?v=4">
+    <link rel="stylesheet" href="/style/editing-activity.css?v=5">
     <link rel="stylesheet" href="/style/footer.css?v=2">
     <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet" media="print" onload="this.media='all'">
     <noscript><link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet"></noscript>
@@ -834,6 +834,16 @@ foreach ($existingImages as $image) {
     descriptionCount.textContent = String(fields.description.value.length);
   }
 
+  function syncAll() {
+    syncInputLimits();
+    updateDateLockSummary();
+    updatePreview();
+    updateTimeline();
+    updateDescriptionCount();
+    updateCompletion();
+    if (preview.status) preview.status.textContent = form.checkValidity() ? 'Ready' : 'Draft';
+  }
+
   function updateCompletion() {
     if (!completionText || !completionBar || !completionList) return;
 
@@ -852,7 +862,7 @@ foreach ($existingImages as $image) {
     const validCount = items.reduce((count, item) => {
       const key = item.dataset.check;
       const passed = Boolean(checks[key]);
-      item.classList.toggle('is-complete', passed);
+      item.classList.toggle('is-done', passed);
       const icon = item.querySelector('i');
       if (icon) icon.className = passed ? 'bx bx-check-circle' : 'bx bx-circle';
       return count + (passed ? 1 : 0);
@@ -862,6 +872,8 @@ foreach ($existingImages as $image) {
     completionText.textContent = percent + '%';
     if (completionCount) completionCount.textContent = `${validCount}/${items.length} รายการ`;
     completionBar.style.width = percent + '%';
+    const meter = completionBar.closest('.completion-meter');
+    if (meter) meter.style.setProperty('--complete', percent + '%');
   }
 
   function getStagedImageCount() {

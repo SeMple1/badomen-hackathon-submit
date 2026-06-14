@@ -17,12 +17,10 @@ switch ($_SERVER['REQUEST_METHOD']) {
 
 function get(): void
 {
-    /*
     if (!isset($_SESSION['user_id'])) {
         header('Location: ' . appUrl('/login'));
         exit;
     }
-    */
 
     $eventId = getEventIdFromRequest();
     if ($eventId === null) {

@@ -1,9 +1,8 @@
 <?php
 $experienceCsrf = function_exists('csrfToken') ? csrfToken() : '';
 ?>
-<link rel="stylesheet" href="/style/experience-popup.css?v=2" media="print" onload="this.media='all'">
-<noscript><link rel="stylesheet" href="/style/experience-popup.css?v=2"></noscript>
-<div class="experience-popup" id="experiencePopup" aria-hidden="true">
+<link rel="stylesheet" href="/style/experience-popup.css?v=3">
+<div class="experience-popup" id="experiencePopup" aria-hidden="true" hidden>
     <div class="experience-popup__backdrop" data-experience-close></div>
     <section class="experience-popup__panel" role="dialog" aria-modal="true" aria-labelledby="experienceTitle">
         <button type="button" class="experience-popup__close" data-experience-close aria-label="ปิด">×</button>
@@ -35,7 +34,10 @@ $experienceCsrf = function_exists('csrfToken') ? csrfToken() : '';
     const submit = document.getElementById('experienceSubmit');
     const stars = Array.from(popup.querySelectorAll('[data-rating]'));
     const DISMISSED_KEY = 'badomen_feedback_dismissed_v1';
+    const AUTO_SUPPRESS_UNTIL_KEY = 'badomen_feedback_auto_suppress_until_v1';
     const DISMISS_LIMIT = 80;
+    const AUTO_SUPPRESS_MS = 24 * 60 * 60 * 1000;
+    const dismissedMemory = new Set();
     let current = null;
     let rating = 0;
     let openTimer = null;
@@ -63,43 +65,63 @@ $experienceCsrf = function_exists('csrfToken') ? csrfToken() : '';
     }
 
     function readDismissed() {
+        const rawValues = [];
+        try { rawValues.push(localStorage.getItem(DISMISSED_KEY)); } catch (_) {}
+        try { rawValues.push(sessionStorage.getItem(DISMISSED_KEY)); } catch (_) {}
+        const list = Array.from(dismissedMemory);
+        rawValues.filter(Boolean).forEach((raw) => {
+            try {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) list.push(...parsed.filter(Boolean));
+            } catch (_) {}
+        });
+        return Array.from(new Set(list));
+    }
+
+    function isAutoSuppressed() {
         try {
-            const raw = localStorage.getItem(DISMISSED_KEY) || sessionStorage.getItem(DISMISSED_KEY) || '[]';
-            const list = JSON.parse(raw);
-            return Array.isArray(list) ? list.filter(Boolean) : [];
+            return Number(sessionStorage.getItem(AUTO_SUPPRESS_UNTIL_KEY) || 0) > Date.now();
         } catch (_) {
-            return [];
+            return false;
         }
     }
 
     function hasDismissed(item) {
-        return readDismissed().includes(feedbackKey(item));
+        const key = feedbackKey(item);
+        return dismissedMemory.has(key) || readDismissed().includes(key);
     }
 
     function rememberDismissed(item = current) {
         const key = feedbackKey(item);
+        dismissedMemory.add(key);
         const list = readDismissed().filter((entry) => entry !== key);
         list.unshift(key);
         const next = JSON.stringify(list.slice(0, DISMISS_LIMIT));
         try {
             localStorage.setItem(DISMISSED_KEY, next);
         } catch (_) {
-            sessionStorage.setItem(DISMISSED_KEY, next);
+            try { sessionStorage.setItem(DISMISSED_KEY, next); } catch (_) {}
         }
     }
 
+    function suppressAutoOpen() {
+        try {
+            sessionStorage.setItem(AUTO_SUPPRESS_UNTIL_KEY, String(Date.now() + AUTO_SUPPRESS_MS));
+        } catch (_) {}
+    }
+
     function queueOpen(item, delay = 450) {
-        if (!item || hasDismissed(item)) return;
+        if (!item || hasDismissed(item) || isAutoSuppressed()) return;
         if (openTimer) window.clearTimeout(openTimer);
         openTimer = window.setTimeout(() => {
             openTimer = null;
-            if (!hasDismissed(item)) open(item);
+            if (!hasDismissed(item) && !isAutoSuppressed()) open(item);
         }, delay);
     }
 
     function open(item) {
         current = item || { feedback_type: 'app', registration_id: 0, refund_id: 0 };
-        if (hasDismissed(current) && !current.force_open) return;
+        if (!current.force_open && (hasDismissed(current) || isAutoSuppressed())) return;
         rating = 0;
         comment.value = '';
         message.textContent = '';
@@ -108,6 +130,7 @@ $experienceCsrf = function_exists('csrfToken') ? csrfToken() : '';
         title.textContent = current.event_title ? `${text[1]} · ${current.event_title}` : text[1];
         description.textContent = text[2];
         paintStars();
+        popup.hidden = false;
         popup.classList.add('is-open');
         popup.setAttribute('aria-hidden', 'false');
         document.body.classList.add('experience-open');
@@ -118,9 +141,13 @@ $experienceCsrf = function_exists('csrfToken') ? csrfToken() : '';
             window.clearTimeout(openTimer);
             openTimer = null;
         }
-        if (current) rememberDismissed(current);
+        if (current && !current.force_open) {
+            rememberDismissed(current);
+            suppressAutoOpen();
+        }
         popup.classList.remove('is-open');
         popup.setAttribute('aria-hidden', 'true');
+        popup.hidden = true;
         document.body.classList.remove('experience-open');
     }
 

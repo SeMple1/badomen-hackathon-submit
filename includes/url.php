@@ -52,6 +52,30 @@ function appUrl(string $path = '/'): string
     return $basePath . ($normalized === '/' ? '/' : $normalized);
 }
 
+function appAbsoluteUrl(string $path = '/'): string
+{
+    $path = trim($path);
+    if ($path !== '' && preg_match('#^(?:[a-z][a-z0-9+.-]*:)?//#i', $path)) {
+        return $path;
+    }
+
+    $configured = trim((string)(getenv('APP_URL') ?: ''));
+    if ($configured !== '') {
+        $origin = rtrim($configured, '/');
+    } else {
+        $host = trim((string)($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? ''));
+        if ($host !== '' && !str_contains($host, '/') && !str_starts_with($host, '#')) {
+            $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+                || (strtolower((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https');
+            $origin = ($https ? 'https' : 'http') . '://' . $host;
+        } else {
+            $origin = 'https://badomen.gonggang.net';
+        }
+    }
+
+    return $origin . appUrl($path);
+}
+
 function stripAppBasePath(string $path): string
 {
     $basePath = appBasePath();
